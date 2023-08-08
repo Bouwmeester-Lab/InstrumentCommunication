@@ -62,7 +62,7 @@ Obj
 %% initialize ZI 
 Obj=zi_start_recording_demods(0.1, 'dev812', 1, 'y'); % zurich instrumentation communcation
 Obj
-zi_stop_recording_demods(Obj);
+zi_stop_recording_demods(Obj); %you don't need this at all.
 disp('done')
 %% update curve //to read channel 1 and plot
 h=figure;
