@@ -87,7 +87,7 @@ T_ampl=0.6;
 V_dist=0;
 V=zi_get_aux_offset(2);
 dV=0.009;
-r_min=0.8;
+r_min=0.8; % reflection threshold after which you consider you see a resonance
 AMPLi=1;
 %r_min=0.6;
 prev_V_dist_sign=1;
@@ -105,33 +105,35 @@ aux_n=2; %temperature control of small innolight
 while ishghandle(h)    
     disp(i)
     %try
-        X=scope_read_waveform(visaObj, 1); %cavity reflection
+        X=scope_read_waveform(visaObj, 1); %cavity reflection from the oscilloscope
         h1=plot(X(:,2),'k');
-        [a ind]=min(X(:,2)); % get the minima and the index
+        [a ind]=min(X(:,2)); % get the minima and the index for the reflection
         L=length(X(:,2));
         %[a ind/L]
 
         if ind>L/2
-            top_V_cur=mean(X(1:(ind-round(L/10)),2)); % top_V_cur off resonance voltage       
+            top_V_cur=mean(X(1:(ind-round(L/10)),2)); % top_V_cur off resonance voltage
         else
-            top_V_cur=mean(X((ind+round(L/10)):end,2));
+            top_V_cur=mean(X((ind+round(L/10)):end,2)); % same but other side
         end
 
-        if top_V_cur>0.01% && a/top_V_cur<0.9        
+        if top_V_cur > 0.01 % && a/top_V_cur<0.9 % checks if you see any light       
             change=0;                
-            if (max(X(:,2))-a)/max(X(:,2))<r_min
+            if (max(X(:,2))-a)/max(X(:,2)) < r_min % coupling efficiency compared to threshold
                 disp('search')
                 %no dip, change V            
-                prev_V_dist_sign=-prev_V_dist_sign;
-                V_dist=V_dist+dV
+                % the one below changes the direction of the search on each iteration
+                prev_V_dist_sign=-prev_V_dist_sign; % searches for the resonance by changing the voltage on the small inolight temperature control. Here we set the direction of the voltage change.
+
+                V_dist = V_dist + dV % dv is the voltage step and vdist is the step we do on each iteration which increases by dV every new iteration
                 %V=zi_get_aux_offset(4);
                 V=V+V_dist*prev_V_dist_sign
-                change=1;
+                change=1; % this is the flag for telling the code to change the voltage on the zurich
             else
                 disp('found')
-                dip_V(dip_Vi, :)=[now a];
+                dip_V(dip_Vi, :)=[now a]; % saves the dip in an array with a timestamp
                 dip_Vi=dip_Vi+1;
-                top_V(top_Vi,:)=[now top_V_cur];
+                top_V(top_Vi,:)=[now top_V_cur]; % saves the off resonance voltage
                 top_Vi=top_Vi+1;
                 i=i+1;
                 
@@ -147,24 +149,26 @@ while ishghandle(h)
                 %V_data=[V_data ; string(datetime('now')) top_V_cur a];
                 %csvwrite('topdipV0727.csv', V_data);
                 
-                V_dist=0;
-                %bring to center
-                if ind<L/4
-                    V=zi_get_aux_offset(2);
-                    V=V+0.002;
-                    change=1;
+                V_dist=0; % resets the search parameter for the search since you've found the resonance
+
+                % bring to center by checking on which quadrant the peak is at, and if it's on the first it will change the voltage on the zurich by 0.002, if it's on the third by -0.002
+                % these values are measured to work pretty realibly
+                if ind < L/4
+                    V = zi_get_aux_offset(2); % get the current auxiliary offset voltage
+                    V = V+0.002;
+                    change = 1;
                 end
-                if ind>3*L/4
-                    V=zi_get_aux_offset(2);
-                    V=V-0.002;
-                    change=1;
+                if ind > 3*L/4
+                    V = zi_get_aux_offset(2);
+                    V = V-0.002;
+                    change = 1;
                 end  
             end
 
-            if change
+            if change % executes the change in the auxialiry output of the zurich
                 small_inno_V=[small_inno_V; now V];
                 disp(['------------------------------------------------------------new V ' num2str(V) ' ' datestr(now)])
-                %small innolight:
+                %small innolight: % checks if its in a mode hope free region
                 if V<1.4
                     %V=V+(5.8-1.4-T_ampl); %mode hop free range
                     V=V+3.8; %mode hop free range
@@ -180,32 +184,32 @@ while ishghandle(h)
 %                 if V>3.1
 %                     V=V-2.5;
 %                 end
-                zi_set_aux_offset(aux_n, V)
+                zi_set_aux_offset(aux_n, V) % sets the voltage
 
-                if V_dist==0
+                if V_dist==0 % pause some time for things to thermalize, 1 sec if just centering or 5 seconds if searching for a peak
                     pause(1)
                 else
                     pause(5)
                 end
             end
         else
-            %no light
+            % if no light log that we have no light at the time now
             dip_detector_zero_V=[dip_detector_zero_V; now top_V_cur];
         end
 
         %swap T
         swap_sign=1;
-        if V>5.3-0.6
+        if V > 5.3-0.6 % voltage sweep by 0.6V
         %if V>3.1-0.6
             swap_sign=-1;
         end
         
-if mod(i, 5)==1 && V>1.5 && V<5.3       %small innolight
+if mod(i, 5) == 1 && V > 1.5 && V < 5.3       %small innolight
         %if mod(i, 500)==1 && V>0.4 && V<3.1       %big
-            disp('sweep')
+            disp('sweep') % sweeps the voltage by 0.6 V
             V_last=V;
             AMPL(AMPLi, 1)=now;
-            for j=1:20
+            for j=1:20 % steps in the sweep
 
                 V=zi_get_aux_offset(2);
                 V=V+swap_sign*T_ampl/25;
@@ -227,8 +231,8 @@ if mod(i, 5)==1 && V>1.5 && V<5.3       %small innolight
             end
             
             AMPLi=AMPLi+1;
-            Ratio_tip_interf=(max(AMPL(AMPLi-1, 2:end))-min(AMPL(AMPLi-1, 2:end)))/max(AMPL(AMPLi-1, 2:end));            
-            min_max=min(AMPL(AMPLi-1, 2:end))/max(AMPL(AMPLi-1, 2:end))
+            Ratio_tip_interf=(max(AMPL(AMPLi-1, 2:end))-min(AMPL(AMPLi-1, 2:end)))/max(AMPL(AMPLi-1, 2:end));         % ignore the first element because it's the timestamp
+            min_max=min(AMPL(AMPLi-1, 2:end))/max(AMPL(AMPLi-1, 2:end)) % same comment
             
             %TIME_LIST = [TIME_LIST,string(datetime('now'))];
             %DATA_LIST(end+1) = [min_max];
@@ -255,7 +259,7 @@ end
             
         pause(0.1)
         delete(h1)
-end
+end % end of sweep and track of the peak, only this will be ported to python
 %% csvwrite
 h=figure;hold on
 ylim([-0.05 0.5])
