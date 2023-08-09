@@ -87,7 +87,8 @@ class LaserManager:
                  peak_threshold : float = 1,
                  min_coupling : float = 0.8,
                  no_light_threshold : float = 0.01,
-                 max_search_steps : int = 5) -> None:
+                 max_search_steps : int = 5,
+                 sweep_iteration_period : int = 100) -> None:
         self.zurich = zurich
         self.scope = scope
         self.scope_channel = scope_channel
@@ -102,6 +103,11 @@ class LaserManager:
         self.no_light_threshold = no_light_threshold
 
         self.max_search_steps = max_search_steps
+        self.sweep_iteration_period = sweep_iteration_period
+
+        self.loop_number = 0
+
+        
         pass
     def search_resonance(self, resonance_voltage, off_resonance_voltage):
         print("Searching resonance...")
@@ -134,6 +140,9 @@ class LaserManager:
         """
         if(off_resonance_voltage < self.no_light_threshold):
                 raise NoLightError("There's no light visible!")
+        
+    def sweep(self):
+        pass
     
     def manage_loop(self, filename : str):
         try:
@@ -156,6 +165,10 @@ class LaserManager:
                     self.laser.setVoltage(self.laser.getVoltage() + 0.002)
                 elif cuadrant == 3:
                     self.laser.setVoltage(self.laser.getVoltage() - 0.002)
+                    
+            if not (self.loop_number % self.sweep_iteration_period):
+                self.sweep()
+            self.loop_number += 1
         except NoLightError:
             pass
         except VoltageModeHopError:
@@ -174,15 +187,17 @@ def main(scope_resource_name : str,
           scope_channel : int,
           peak_threshold : float = 1,
           min_coupling : float = 0.8,
-          no_light_threshold : float = 0.01) -> None:
+          no_light_threshold : float = 0.01,
+          period_in_seconds : int = 120) -> None:
     # ask the scheduler
     with ag.AgilentScope(scope_resource_name) as scope:
         with zi.ZurichInstruments(zi_device_serial_name, api_level) as zurich:
             laser = Laser(mode_hop_zones, zurich, laser_channel_zi)
             laser_manager = LaserManager(zurich, scope, scope_channel, laser)
 
-            laser_manager.manage_loop(file_name_path)
-            
+            loop = task.LoopingCall(laser_manager.manage_loop, filename)
+            loop.start(period_in_seconds)
+            reactor.run()
 
 
     
@@ -196,8 +211,4 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
     
     file_name_path = ""
 
-    loop = task.LoopingCall(main, (scope_resource_name, zi_device_serial_name, api_level, file_name_path))
-    loop.start(period_in_seconds)
-
-    reactor.run()
-            
+    main(scope_resource_name, zi_device_serial_name, api_level, file_name_path, period_in_seconds = period_in_seconds)
