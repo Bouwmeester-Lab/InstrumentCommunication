@@ -2,6 +2,7 @@
 
 ## it makes a few improvements like using the agilent library created in the agilent folder as well as the zurich's wrapper in the zurich folder.
 
+from time import sleep
 import agilent.agilent as ag
 import zurich.zurich as zi
 from twisted.internet import task, reactor
@@ -26,6 +27,9 @@ class LoopingCallWithCounter:
         self.lc = LoopingCall(wrapper)
 
 class NoLightError(Exception):
+    pass
+
+class SearchStepsExhausted(Exception):
     pass
 
 def calculateOffResonanceVoltage(voltages : np.array, height : float, find_minima : bool = True):
@@ -76,6 +80,90 @@ def append_data(filename : str, datetime : datetime, voltage : float):
         writer = csv.writer(f)
         writer.writerow([f"{datetime.timestamp()}", f"{voltage:.3e}"])
 
+class LaserManager:
+    def __init__(self, zurich : zi.ZurichInstruments, scope : ag.AgilentScope, scope_channel : int,
+                 laser : Laser,
+                 search_step_size : float = 0.009,
+                 peak_threshold : float = 1,
+                 min_coupling : float = 0.8,
+                 no_light_threshold : float = 0.01,
+                 max_search_steps : int = 5) -> None:
+        self.zurich = zurich
+        self.scope = scope
+        self.scope_channel = scope_channel
+        self.laser = laser
+
+        self.search_direction = -1
+        self.search_step = 0
+        self.search_step_size = search_step_size
+
+        self.peak_threshold = peak_threshold
+        self.min_coupling = min_coupling
+        self.no_light_threshold = no_light_threshold
+
+        self.max_search_steps = max_search_steps
+        pass
+    def search_resonance(self, resonance_voltage, off_resonance_voltage):
+        print("Searching resonance...")
+        
+        for i in range(self.max_search_steps):
+            if self.is_resonance_found(resonance_voltage, off_resonance_voltage):
+                print("Found resonance after searching")
+                return # return, end the search
+            
+            self.search_step += self.search_step_size
+            self.search_direction *= -1 # flip the search direction on each step
+            self.laser.setVoltage(self.laser.getVoltage() + self.search_direction*self.search_step)
+
+            # get the resonance voltage from the scope again after a small pause
+            sleep(3)
+
+            _, resonance_voltage, off_resonance_voltage = getVoltages(self.scope, self.scope_channel, self.peak_threshold)
+            self.assert_enough_light(off_resonance_voltage) # check that there's still light
+        raise SearchStepsExhausted(f"Couldn't find the resonance after {self.max_search_steps}")
+
+
+    def is_resonance_found(self, resonance_voltage, off_resonance_voltage):
+        coupling_efficiency = (off_resonance_voltage - resonance_voltage) / off_resonance_voltage
+        return coupling_efficiency > self.min_coupling
+    
+    def assert_enough_light(self, off_resonance_voltage):
+        """
+        Checks that there's enough light.
+        If not it raises an error NoLightError
+        """
+        if(off_resonance_voltage < self.no_light_threshold):
+                raise NoLightError("There's no light visible!")
+    
+    def manage_loop(self, filename : str):
+        try:
+            cuadrant, resonance_voltage, off_resonance_voltage = getVoltages(self.scope, self.scope_channel, self.peak_threshold)
+            
+            self.assert_enough_light(off_resonance_voltage)
+
+            if not self.is_resonance_found(resonance_voltage, off_resonance_voltage):
+                # we haven't found the resonance. Time to search for it
+                self.search_resonance()
+                pass
+            else:
+                # we have found the resonance.
+                now = datetime.utcnow() # use utc time to avoid time zone issues
+                # save the data
+                append_data(filename=f"{filename}_off_resonance.csv", datetime=now, voltage=off_resonance_voltage)
+                append_data(filename=f"{filename}_resonance.csv", datetime=now, voltage=resonance_voltage)
+
+                if cuadrant == 0:
+                    self.laser.setVoltage(self.laser.getVoltage() + 0.002)
+                elif cuadrant == 3:
+                    self.laser.setVoltage(self.laser.getVoltage() - 0.002)
+        except NoLightError:
+            pass
+        except VoltageModeHopError:
+            pass
+        except:
+            pass
+
+
 
 def main(scope_resource_name : str,
           zi_device_serial_name : str,
@@ -84,48 +172,24 @@ def main(scope_resource_name : str,
           mode_hop_zones : list[tuple[float, float]],
           laser_channel_zi : int,
           scope_channel : int,
-          peak_threshold : float = 0.8,
+          peak_threshold : float = 1,
           min_coupling : float = 0.8,
           no_light_threshold : float = 0.01) -> None:
     # ask the scheduler
     with ag.AgilentScope(scope_resource_name) as scope:
         with zi.ZurichInstruments(zi_device_serial_name, api_level) as zurich:
             laser = Laser(mode_hop_zones, zurich, laser_channel_zi)
-            try:
-                cuadrant, resonance_voltage, off_resonance_voltage = getVoltages(scope, scope_channel, peak_threshold)
-                
-                if(off_resonance_voltage < no_light_threshold):
-                    raise NoLightError("There's no light visible!")
-                
-                coupling_efficiency = (off_resonance_voltage - resonance_voltage) / off_resonance_voltage
+            laser_manager = LaserManager(zurich, scope, scope_channel, laser)
 
-                if coupling_efficiency < min_coupling:
-                    # we haven't found the resonance. Time to search for it
-                    pass
-                else:
-                    # we have found the resonance.
-                    now = datetime.utcnow() # use utc time to avoid time zone issues
-                    # save the data
-                    append_data(filename=f"{filename}_off_resonance.csv", datetime=now, voltage=off_resonance_voltage)
-                    append_data(filename=f"{filename}_resonance.csv", datetime=now, voltage=resonance_voltage)
-
-                    if cuadrant == 0:
-                        laser.setVoltage(laser.getVoltage() + 0.002)
-                    elif cuadrant == 3:
-                        laser.setVoltage(laser.getVoltage() - 0.002)
-            except NoLightError:
-                pass
-            except VoltageModeHopError:
-                pass
-            except:
-                pass
+            laser_manager.manage_loop(file_name_path)
+            
 
 
     
 
 
 if __name__ == "__main__": # runs only if ran directly. This is not a library
-    period_in_seconds = 60
+    period_in_seconds = 120
     scope_resource_name = "USB0::0x0957::0x179A::MY51250106::0::INSTR"
     zi_device_serial_name = "dev012"
     api_level = 6 # depends on the device used. HF2 only supports api level = 1, other devices support level 6.
