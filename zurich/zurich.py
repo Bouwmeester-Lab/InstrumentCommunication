@@ -1,4 +1,4 @@
-# make sure you run pip install zhinst before using this! You need the labone packages to interface with the Zurich Instruments
+# make sure you run "pip install zhinst" before using this! You need the labone packages to interface with the Zurich Instruments
 # see https://docs.zhinst.com/labone_programming_manual/introduction.html and https://docs.zhinst.com/labone_programming_manual/python.html
 import zhinst.utils as ziutils
 
@@ -36,8 +36,10 @@ class ZurichInstruments:
     def connect(self) -> None:
         self.daq.connect()
 
+    # allows you to use the "with" keyword in Python
     def __enter__(self) -> Self:
         self.initialize()
+    # allows you to use the "with" keyword in Python
     def __exit__(self, type, value, traceback) -> None:
         pass
 
@@ -49,6 +51,14 @@ class ZurichInstruments:
         self.daq.disconnect()
     
     def getOffsetValue(self, channel : int, from_zero : bool = False) -> float:
+        """
+        Allows you to get the voltage on the auxiliary channels of the ZI.
+        Args:
+            - channel is the channel to be queried
+            - from_zero is how you are counting your channels, from zero or from 1: channels 0,1,2,3 or channels 1,2,3,4
+        Returns:
+            A float corresponding to the voltage queried.
+        """
         if not from_zero:
             channel -= 1 # this fixes the channel if the user expects to communicate from chan 1 to 4 and not 0 to 3
 
@@ -59,6 +69,14 @@ class ZurichInstruments:
         return self.daq.getDouble(path)
     
     def setOffsetValue(self, channel : int, value : float, from_zero : bool = False) -> None:
+        """
+        Allows you to set the voltage on the auxiliary channels of the ZI.
+        Args:
+            - channel is the channel to be queried
+            - from_zero is how you are counting your channels, from zero or from 1: channels 0,1,2,3 or channels 1,2,3,4
+        Returns:
+            Nothing
+        """
         if not from_zero:
             channel -= 1 # this fixes the channel if the user expects to communicate from chan 1 to 4 and not 0 to 3
         
