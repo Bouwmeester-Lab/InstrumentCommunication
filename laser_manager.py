@@ -11,7 +11,7 @@ from datetime import datetime
 from time import sleep
 
 
-
+# not used
 class LoopingCallWithCounter:
     def __init__(self, count, f, *a, **kw) -> None:
         self.i = 0
@@ -32,35 +32,45 @@ class SearchStepsExhausted(Exception):
 class NoSweepDirectionFound(Exception):
     pass
 
-def calculateOffResonanceVoltage(voltages : np.array, height : float, find_minima : bool = True):
+def calculateAllVoltages(voltages : np.array, height : float, find_minima : bool = True) -> tuple[Union[None, int], float, float]:
     """
     Calculates the off resonance voltage from the voltages taken from the oscilloscope.
     args:
         - voltages is the Y axis of the oscilloscope
         - height is the minimum height of each peak
         - find_minima are we looking for minima or maxima?
+    Returns:
+        - cuadrant of the peak, is it in which cuadrant of the oscilloscope?
+        - resonance voltage
+        - off resonance voltage
     """
+    multiplier = 1
     if find_minima:
         voltages *= -1 # our find peaks finds maximas
         height *= -1
+        multiplier = -1
+
     peaks, _ = find_peaks(voltages, height=height)
     widths, _, intersections = peak_widths(voltages, peaks, rel_height=0.95)
 
-    resonance_voltage = np.mean(voltages[peaks])
+    resonance_voltage = np.mean(multiplier*voltages[peaks])
     
     ind = np.ones_like(voltages, bool)
     ind[np.r_[intersections]] = False
 
-    off_resonance_voltage = np.mean(voltages[ind]) # https://stackoverflow.com/questions/32723993/how-to-exclude-few-ranges-from-numpy-array-at-once
+    off_resonance_voltage = np.mean(multiplier*voltages[ind]) # https://stackoverflow.com/questions/32723993/how-to-exclude-few-ranges-from-numpy-array-at-once
     
-    if peaks[0] < len(voltages)/4:
-        cuadrant = 0
-    elif peaks[0] < len(voltages)/2:
-        cuadrant = 1
-    elif peaks[0] < len(voltages)*0.75:
-        cuadrant = 2
+    if len(peaks) > 0:
+        if peaks[0] < len(voltages)/4:
+            cuadrant = 0
+        elif peaks[0] < len(voltages)/2:
+            cuadrant = 1
+        elif peaks[0] < len(voltages)*0.75:
+            cuadrant = 2
+        else:
+            cuadrant = 3
     else:
-        cuadrant = 3
+        cuadrant = None
 
     return cuadrant, resonance_voltage, off_resonance_voltage
 
@@ -73,7 +83,7 @@ def getVoltages(scope : ag.AgilentScope, scope_channel : int, threshold : float)
     Returns the cuadrant (from 0 to 3) of the resonance voltage, the resonance voltage and off resonance voltage - calculated -
     """
     voltages = scope.get_scope_waveform(scope_channel)
-    return calculateOffResonanceVoltage(voltages, threshold)
+    return calculateAllVoltages(voltages, threshold)
 
 def calculateRatioInterference(off_resonance_voltages : np.array):
     """
@@ -110,7 +120,13 @@ def append_data(filename : str, data : Union[list[float], float], datetime : Uni
             writer.writerow(values)
 
 class LaserManager:
-    def __init__(self, zurich : zi.ZurichInstruments, scope : ag.AgilentScope, scope_channel : int,
+    """
+    This contains all the main logic surrounding the laser, the sweep and the off and resonance values
+    """
+    def __init__(self, 
+                 zurich : zi.ZurichInstruments,
+                 scope : ag.AgilentScope,
+                 scope_channel : int,
                  laser : Laser,
                  search_step_size : float = 0.009,
                  peak_threshold : float = 1,
@@ -143,7 +159,7 @@ class LaserManager:
         self.loop_number = 0
 
         
-        pass
+        
     def search_resonance(self, resonance_voltage, off_resonance_voltage):
         print("Searching resonance...")
         
@@ -160,7 +176,12 @@ class LaserManager:
             sleep(3)
 
             _, resonance_voltage, off_resonance_voltage = getVoltages(self.scope, self.scope_channel, self.peak_threshold)
-            self.assert_enough_light(off_resonance_voltage) # check that there's still light
+            self.assert_enough_light(off_resonance_voltage) # check that there's still light        
+        
+        if self.is_resonance_found(resonance_voltage, off_resonance_voltage):
+            print("Found resonance after searching")
+            return # return, end the search
+        
         raise SearchStepsExhausted(f"Couldn't find the resonance after {self.max_search_steps}")
 
 
@@ -207,13 +228,10 @@ class LaserManager:
         
         ratio, difference = calculateRatioInterference(off_resonance_voltages_during_sweep)
 
-        append_data(filename=f"{filename}_minmax_sweep_{now.timestamp()}.csv", datetime=now, data = [ratio, difference])
+        append_data(filename=f"{filename}_minmax_sweep.csv", datetime=now, data = [ratio, difference])
 
         # reset the voltage to the original value
         self.laser.setVoltage(original_voltage)
-
-
-        pass
     
     def manage_loop(self, filename : str):
         try:
@@ -224,7 +242,6 @@ class LaserManager:
             if not self.is_resonance_found(resonance_voltage, off_resonance_voltage):
                 # we haven't found the resonance. Time to search for it
                 self.search_resonance()
-                pass
             else:
                 # we have found the resonance.
                 now = datetime.utcnow() # use utc time to avoid time zone issues
@@ -232,6 +249,7 @@ class LaserManager:
                 append_data(filename=f"{filename}_off_resonance.csv", datetime=now, data=off_resonance_voltage)
                 append_data(filename=f"{filename}_resonance.csv", datetime=now, data=resonance_voltage)
 
+                # centers the peak if needed
                 if cuadrant == 0:
                     self.laser.setVoltage(self.laser.getVoltage() + 0.002)
                 elif cuadrant == 3:
