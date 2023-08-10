@@ -4,6 +4,7 @@ It will also use the zurich instrument to set the voltages and do the scans.
 """
 from typing import Union
 import zurich.zurich as zi
+import agilent.agilent as ag
 
 class VoltageModeHopError(Exception):
     pass
@@ -46,16 +47,39 @@ class Laser:
     def getVoltage(self) -> float:
         return self.zurich_instrument.getOffsetValue(self.channel, self.from_zero)
     
-    # def sweepVoltage(self, total_sweep : float, steps : int, forward_sweep : bool = True):
-    #     """
-    #     Sweeps a voltage range in the 
-    #     """
-    #     def stepVoltage():
-    #         if forward_sweep:
-    #             new_voltage = self.getVoltage() + total_sweep / steps
-    #         else:
-    #             new_voltage = self.getVoltage() - total_sweep / steps
-    #         self.setVoltage(new_voltage)
+    def stepVoltage(self, total_sweep : float, steps : int, forward_sweep : bool = True):
+        if forward_sweep:
+            new_voltage = self.getVoltage() + total_sweep / steps
+        else:
+            new_voltage = self.getVoltage() - total_sweep / steps
+        self.setVoltage(new_voltage)
+
+    
+    def isSweepInModeHopRegion(self, total_sweep : float, steps : int, starting_voltage = None, forward_sweep : bool = True):
+        """
+        checks if a sweep enters a Mode Hop region.
+        Args:
+            - total_sweep: the total length of the sweep
+            - steps: the number of steps to take
+            - forward_sweep: is the sweep in the forward direction (positive steps)
+        Returns:
+            - bool, (lower, upper) or None : is sweep in a Mode Hop region? | the lower and upper bound of the first found conflicting region if any.
+        """
+        if starting_voltage is None:
+            starting_voltage = self.getVoltage()
+        if forward_sweep:
+            voltages_in_sweep = [starting_voltage + (step+1)*total_sweep / (steps) for step in range(steps)]
+        else:
+            voltages_in_sweep = [starting_voltage - (step+1)*total_sweep / (steps) for step in range(steps)]
+        
+        for voltage in voltages_in_sweep:
+            mode_hop, region = self.__is_mode_hop(voltage)
+            if mode_hop:
+                return mode_hop, region
+        return False, None
+
+
+
 
 
     
