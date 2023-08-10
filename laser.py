@@ -16,7 +16,10 @@ class Laser:
         """
         Creates a laser object
         args:
-            mode_hop_free_ranges: a list of voltage ranges where the laser has mode hops
+            mode_hop_ranges: a list of voltage ranges where the laser has mode hops - regions to be AVOIDED
+            zurich_instrument: the ZI used to control the laser voltage
+            channel: the channel in the ZI used
+            from_zero: how are you counting the channels? from_zero = True: 0, 1, 2, 3 ; from_zero = False: 1, 2, 3, 4
         """
         self.mode_hop_ranges = []
         for (v1, v2) in mode_hop_ranges:
@@ -29,7 +32,7 @@ class Laser:
     
     def __is_mode_hop(self, voltage : float) -> tuple[bool, Union[None, tuple[float, float]]]:
         """
-        Checks if the voltage is in a hop region.
+        Checks if the voltage is in a mode hop region.
         It returns False if it's not in a mode hop region and True if it's in a hop region and the region that it found as a match (or None if no region was matched)
         """
         
