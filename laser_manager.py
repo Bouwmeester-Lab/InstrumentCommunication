@@ -106,7 +106,7 @@ def append_data(filename : str, data : Union[list[float], float], datetime : Uni
     It can add the datetime as the first column to the data.
     You can specify the format to use to display the saved data in the CSV file for the Data. Usually uses 3 decimal values scientific notation (Small e).
     """
-    with open(filename, 'a') as f:
+    with open(filename, 'a', newline='') as f:
         writer = csv.writer(f)
         
         try:
