@@ -7,7 +7,7 @@ import pyvisa
 class AgilentPointsMode(str, Enum):
     normal = "NORM"
     maximum = "MAX"
-    raw = "raw"
+    raw = "RAW"
 
 class AgilentTimebaseMode(str, Enum):
     window = "WIND"
@@ -63,10 +63,12 @@ class AgilentScope:
         self.visa_resource.close()
         self.visa_rm.close()
     
+    # allows you to use the "with" keyword in Python
     def __enter__(self) -> Self:
         self.open()
         return self
-
+    
+    # allows you to use the "with" keyword in Python
     def __exit__(self, type, value, traceback) -> None:
         self.close()
 
@@ -75,7 +77,10 @@ class AgilentScope:
                               acquire_type : AgilentAcquisitionType = AgilentAcquisitionType.normal,
                               average_count : int = 3
                               ) -> None:
-        # seyt oscilloscope to single acquisition
+        """
+        Configures the acquisition of data in the oscilloscope.
+        """
+        # set oscilloscope to single acquisition (maybe let's not hard code this in here in the future)
         self.visa_resource.write(AgilentScopeCommands.single)
         
         # set time base to main (default oscilloscope mode)
@@ -91,6 +96,10 @@ class AgilentScope:
                                 waveform_format : WaveformFormat = WaveformFormat.ascii,
                                 byte_order : ByteOrder = ByteOrder.msbfirst,
                                 timeout : int = 5000) -> None:
+        """
+        Configures the data transfer from the oscilloscope to the PC.
+        timeout in milliseconds
+        """
         # set oscilloscope to channel
         self.visa_resource.write(AgilentScopeCommands.source_channel.format(channel = channel))
         self.visa_resource.write(AgilentScopeCommands.points_mode.format(mode = points_mode))
@@ -113,7 +122,7 @@ class AgilentScope:
         if channel is None:
             self.visa_resource.write(AgilentScopeCommands.digitize)
         else:
-            self.visa_resource.write(AgilentScopeCommands.digitize_channel)
+            self.visa_resource.write(AgilentScopeCommands.digitize_channel.format(channel=channel))
     
     def read_data(self):
         if(self.waveform_format == WaveformFormat.ascii):
@@ -128,8 +137,8 @@ class AgilentScope:
     def __read_ascii(self) -> numpy.array:
         self.visa_resource.write(AgilentScopeCommands.data_read)
         data = self.visa_resource.read_raw().decode("utf-8")
-        data = data.split(", ")
-        data[0] = data[0].split(" ")[-1]
+        data = data.split(", ") # separating the data points spaced and separated by a comma
+        data[0] = data[0].split(" ")[-1] # removal of the header of the data: first data point: "#80001335 2.5e6"
 
         return numpy.array(data, dtype=float)
     
@@ -140,7 +149,7 @@ class AgilentScope:
         self.digitize(channel, force_trigger=True)
 
         if configure_data_transfer:
-            self.configure_data_transfer(1)
+            self.configure_data_transfer(channel)
             
         return self.read_data()
         
