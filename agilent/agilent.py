@@ -142,11 +142,11 @@ class AgilentScope:
 
         return numpy.array(data, dtype=float)
     
-    def get_scope_waveform(self, channel : int = 1, configure_acquisition = True, configure_data_transfer = True):
+    def get_scope_waveform(self, channel : int = 1, configure_acquisition = True, configure_data_transfer = True, force_trigger = False):
         if configure_acquisition:
             self.configure_acquisition(channel)
         
-        self.digitize(channel, force_trigger=True)
+        self.digitize(channel, force_trigger=force_trigger)
 
         if configure_data_transfer:
             self.configure_data_transfer(channel)
