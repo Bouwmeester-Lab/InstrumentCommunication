@@ -258,11 +258,15 @@ class LaserManager:
             if not (self.loop_number % self.sweep_iteration_period):
                 self.sweep()
             self.loop_number += 1
-        except NoLightError: # what to do if no light is detected?
+        except NoLightError as e: # what to do if no light is detected?
+            print(e)
             pass
-        except VoltageModeHopError: # what to do if we try to change the voltage to a mode hop region?
+        except VoltageModeHopError as e: # what to do if we try to change the voltage to a mode hop region?
+            print(e)
             pass
-        except NoSweepDirectionFound: # what to do if the sweep fails because it would force the laser into a mode hop region?
+        except NoSweepDirectionFound as e: # what to do if the sweep fails because it would force the laser into a mode hop region?
+            print(e)
             pass
-        except:
+        except Exception as e:
+            print(e)
             pass
