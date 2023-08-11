@@ -62,7 +62,7 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
     peak_threshold = 0.15 # the minimum height of a peak to be considered a resonance
     min_coupling = 0.5 # min coupling for considering a resonance as found
     max_resonance_search_steps = 10 # how many search steps occur before giving up!
-    sweeping_period = 500 # changes how often a sweep occurs
+    sweeping_period = 30 # changes how often a sweep occurs
     sweeping_total_range = 0.6 # the total range of the sweep
     sweeping_steps = 25 # total number of steps in the sweep
 
