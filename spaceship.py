@@ -25,6 +25,7 @@ def main(scope_resource_name : str,
           peak_threshold : float = 1,
           min_coupling : float = 0.8,
           no_light_threshold : float = 0.01,
+          search_step_size : float = 0.009,
           period_in_seconds : int = 120,
           max_resonance_search_steps : int = 10,
           sweeping_period : int = 10,
@@ -40,7 +41,8 @@ def main(scope_resource_name : str,
                                          max_search_steps=max_resonance_search_steps,
                                          sweep_iteration_period=sweeping_period,
                                          sweep_total_range= sweeping_total_range,
-                                         sweep_steps=sweeping_steps)
+                                         sweep_steps=sweeping_steps,
+                                         search_step_size=search_step_size)
 
             loop = task.LoopingCall(laser_manager.manage_loop, filename)
             loop.start(period_in_seconds)
@@ -61,10 +63,16 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
 
     peak_threshold = 0.15 # the minimum height of a peak to be considered a resonance
     min_coupling = 0.5 # min coupling for considering a resonance as found
-    max_resonance_search_steps = 10 # how many search steps occur before giving up!
+
+    max_resonance_search_steps = 100 # how many search steps occur before giving up!
+    search_step_size = 0.009 # the search step size when trying to find a resonance
+
     sweeping_period = 30 # changes how often a sweep occurs
     sweeping_total_range = 0.6 # the total range of the sweep
     sweeping_steps = 25 # total number of steps in the sweep
+
+    
+
 
     mode_hop_zones = [(float("-inf"), 1.4), (5.4, float("inf"))] # there's a mode hop between the smallest voltage to 1.4V and another between 5.4V and the largest voltage.
 
@@ -81,4 +89,5 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
         min_coupling=min_coupling,
         sweeping_period=sweeping_period,
         sweeping_total_range=sweeping_total_range,
-        sweeping_steps = sweeping_steps)
+        sweeping_steps = sweeping_steps,
+        search_step_size=search_step_size)
