@@ -41,13 +41,19 @@ def main(scope_resource_name : str,
 
 
 if __name__ == "__main__": # runs only if ran directly. This is not a library
-    period_in_seconds = 120 # how often do you want to run the measurement code?
-    scope_resource_name = "USB0::0x0957::0x179A::MY51250106::0::INSTR" # the scope VISA resource name.
-    zi_device_serial_name = "dev012" # the name of the zurich instruments
-    api_level = 6 # depends on the device used. HF2 only supports api level = 1, other devices support level 6.
+    period_in_seconds = 20 # how often do you want to run the measurement code?
+    scope_resource_name = "USB0::0x0957::0x179A::MY51450715::0::INSTR" # the scope VISA resource name.
+    zi_device_serial_name = "dev812" # the name of the zurich instruments
+    api_level = 1 # depends on the device used. HF2 only supports api level = 1, other devices support level 6.
     
     file_name_path = "data/data" #this the prefix of all data files generated
 
     mode_hop_zones = [(float("-inf"), 1.4), (5.4, float("inf"))] # there's a mode hop between the smallest voltage to 1.4V and another between 5.4V and the largest voltage.
 
-    main(scope_resource_name, zi_device_serial_name, api_level, file_name_path, period_in_seconds = period_in_seconds, mode_hop_zones=mode_hop_zones)
+    main(scope_resource_name,
+          zi_device_serial_name, 
+          api_level, file_name_path,
+          period_in_seconds = period_in_seconds,
+            mode_hop_zones=mode_hop_zones,
+             laser_channel_zi= 2,
+              scope_channel=1 )
