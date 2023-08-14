@@ -178,7 +178,9 @@ class LaserManager:
 
         self.loop_number = 0
 
-        
+    def __resetSearch(self):
+        self.search_step = 0
+        self.search_direction = -1
         
     def search_resonance(self, resonance_voltage, off_resonance_voltage):
         print("Searching resonance...")
@@ -190,7 +192,11 @@ class LaserManager:
             
             self.search_step += self.search_step_size
             self.search_direction *= -1 # flip the search direction on each step
-            self.laser.setVoltage(self.laser.getVoltage() + self.search_direction*self.search_step)
+            try:
+                self.laser.setVoltage(self.laser.getVoltage() + self.search_direction*self.search_step)
+            except VoltageModeHopError: # if we get out of the safe range restart the search.
+                self.__resetSearch()
+                continue
 
             # get the resonance voltage from the scope again after a small pause
             sleep(3)
