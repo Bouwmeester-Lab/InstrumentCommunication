@@ -90,4 +90,6 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
         sweeping_period=sweeping_period,
         sweeping_total_range=sweeping_total_range,
         sweeping_steps = sweeping_steps,
-        search_step_size=search_step_size)
+        search_step_size=search_step_size,
+        max_resonance_search_steps=max_resonance_search_steps
+        )

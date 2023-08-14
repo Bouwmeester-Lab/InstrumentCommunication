@@ -146,7 +146,8 @@ class AgilentScope:
         data = self.visa_resource.read_raw().decode("ascii")
         data = data.split(",") # separating the data points spaced and separated by a comma
         data[0] = data[0].split(" ")[-1] # removal of the header of the data: first data point: "#80001335 2.5e6"
-
+        if data[0][0] == "#":
+            data[0] = data[0][10:]
         data = list(map(lambda x: x.strip(), data))
 
         return numpy.array(data, dtype=float)
