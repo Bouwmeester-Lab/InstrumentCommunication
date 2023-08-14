@@ -39,6 +39,7 @@ class ZurichInstruments:
     # allows you to use the "with" keyword in Python
     def __enter__(self) -> Self:
         self.initialize()
+        return self
     # allows you to use the "with" keyword in Python
     def __exit__(self, type, value, traceback) -> None:
         pass
@@ -62,7 +63,7 @@ class ZurichInstruments:
         if not from_zero:
             channel -= 1 # this fixes the channel if the user expects to communicate from chan 1 to 4 and not 0 to 3
 
-        path = f"{self.device_serial}/auxouts/{channel}/"
+        path = f"/{self.device_serial}/auxouts/{channel}/offset"
 
         self.daq.sync()
 
@@ -80,7 +81,7 @@ class ZurichInstruments:
         if not from_zero:
             channel -= 1 # this fixes the channel if the user expects to communicate from chan 1 to 4 and not 0 to 3
         
-        path = f"{self.device_serial}/auxouts/{channel}/"
+        path = f"/{self.device_serial}/auxouts/{channel}/offset"
 
         self.daq.setDouble(path, value)
         self.daq.sync()

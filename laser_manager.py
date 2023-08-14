@@ -10,6 +10,9 @@ import csv
 from datetime import datetime
 from time import sleep
 
+import matplotlib.pyplot as plt
+
+plot_debug = False
 
 # not used
 class LoopingCallWithCounter:
@@ -50,13 +53,30 @@ def calculateAllVoltages(voltages : np.array, height : float, find_minima : bool
         height *= -1
         multiplier = -1
 
-    peaks, _ = find_peaks(voltages, height=height)
-    widths, _, intersections = peak_widths(voltages, peaks, rel_height=0.95)
+    plt.plot(voltages)
+    
 
-    resonance_voltage = np.mean(multiplier*voltages[peaks])
+    peaks, _ = find_peaks(voltages, height=height)
+    
+
+    widths, widths_height, left, right = peak_widths(voltages, peaks, rel_height=0.90)
+
+    if plot_debug:
+        plt.plot(peaks, voltages[peaks], "x")
+        plt.hlines(widths_height, left, right)
+        plt.show(block = False)
+
+    if len(peaks) == 0:
+        resonance_voltage = None
+    else:
+        resonance_voltage = np.mean(multiplier*voltages[peaks])
     
     ind = np.ones_like(voltages, bool)
-    ind[np.r_[intersections]] = False
+    left = left.astype(int)
+    right = right.astype(int)
+
+    for i in range(len(left)): # for each peak we set the width to false so that we remove them from the off resonance calculation
+        ind[np.r_[left[i]:right[i]]] = False
 
     off_resonance_voltage = np.mean(multiplier*voltages[ind]) # https://stackoverflow.com/questions/32723993/how-to-exclude-few-ranges-from-numpy-array-at-once
     
@@ -192,6 +212,13 @@ class LaserManager:
 
 
     def is_resonance_found(self, resonance_voltage, off_resonance_voltage):
+        """
+        Compares the coupling efficiency to determine if the resonance was found.
+        If no resonance peak is found and the resonance voltage is None the method will consider the peak not found.
+        """
+        if resonance_voltage is None:
+            return False
+        
         coupling_efficiency = (off_resonance_voltage - resonance_voltage) / off_resonance_voltage
         return coupling_efficiency > self.min_coupling
     
@@ -204,6 +231,9 @@ class LaserManager:
                 raise NoLightError("There's no light visible!")
         
     def sweep(self, filename : str):
+
+        print("Sweeping voltages... configuring sweep")
+
         off_resonance_voltages_during_sweep = np.zeros((self.sweep_steps, 2))
         original_voltage = self.laser.getVoltage()
 
@@ -223,7 +253,9 @@ class LaserManager:
                 raise NoSweepDirectionFound(f"Couldn't find an appropiate direction for the sweep! Sweeping forward would clash with {region}, and sweeping backwards would clash wih {new_region}.")
 
         # sweep
+        print("Sweeping starting...")
         for i in range(self.sweep_steps):
+            print(f"Step {i}/{self.sweep_steps} in sweep.")
             now = datetime.utcnow() # get the time now for later timestamping
             self.laser.stepVoltage(self.sweep_total_range, self.sweep_steps, self.sweep_forward) # does one step in the direction according to sweep forward
 
@@ -231,12 +263,16 @@ class LaserManager:
 
             off_resonance_voltages_during_sweep[i] = [now.timestamp(), off_resonance_voltage]
             sleep(0.1)
-        
-        ratio, difference = calculateRatioInterference(off_resonance_voltages_during_sweep)
+        print("Finished sweep.")
 
-        append_data(filename=f"{filename}_minmax_sweep.csv", datetime=now, data = [ratio, difference])
+        difference_min_max, ratio_min_max = calculateRatioInterference(off_resonance_voltages_during_sweep)
+        print(f"Calculated a ratio of (max - min)/max of {difference_min_max:.5f} and min/max {ratio_min_max:.5f}\n")
+
+        print(f"Appending sweep data in {filename}_minmax_sweep.csv")
+        append_data(filename=f"{filename}_minmax_sweep.csv", datetime=now, data = [difference_min_max, ratio_min_max])
 
         # reset the voltage to the original value
+        print(f"Setting original voltage of {original_voltage:.4e} V.")
         self.laser.setVoltage(original_voltage)
     
     def manage_loop(self, filename : str):
@@ -247,28 +283,36 @@ class LaserManager:
 
             if not self.is_resonance_found(resonance_voltage, off_resonance_voltage):
                 # we haven't found the resonance. Time to search for it
-                self.search_resonance()
+                self.search_resonance(resonance_voltage=resonance_voltage, off_resonance_voltage=off_resonance_voltage)
             else:
+                print(f"Resonance was found!\nResonance voltage {resonance_voltage:.5f} V\nOff Resonance Voltage {off_resonance_voltage:.5f}\n")
                 # we have found the resonance.
                 now = datetime.utcnow() # use utc time to avoid time zone issues
                 # save the data
+                print(f"Appending data to {filename}_off_resonance.csv and {filename}_resonance.csv")
                 append_data(filename=f"{filename}_off_resonance.csv", datetime=now, data=off_resonance_voltage)
                 append_data(filename=f"{filename}_resonance.csv", datetime=now, data=resonance_voltage)
 
                 # centers the peak if needed
                 if cuadrant == 0:
+                    print("Recentering peak from 1st cuadrant!")
                     self.laser.setVoltage(self.laser.getVoltage() + 0.002)
                 elif cuadrant == 3:
+                    print("Recentering peak from 4th cuadrant!")
                     self.laser.setVoltage(self.laser.getVoltage() - 0.002)
                     
             if not (self.loop_number % self.sweep_iteration_period):
-                self.sweep()
+                self.sweep(filename)
             self.loop_number += 1
-        except NoLightError: # what to do if no light is detected?
+        except NoLightError as e: # what to do if no light is detected?
+            print(e)
             pass
-        except VoltageModeHopError: # what to do if we try to change the voltage to a mode hop region?
+        except VoltageModeHopError as e: # what to do if we try to change the voltage to a mode hop region?
+            print(e)
             pass
-        except NoSweepDirectionFound: # what to do if the sweep fails because it would force the laser into a mode hop region?
+        except NoSweepDirectionFound as e: # what to do if the sweep fails because it would force the laser into a mode hop region?
+            print(e)
             pass
-        except:
-            pass
+        # except Exception as e:
+        #     print(e)
+        #     pass

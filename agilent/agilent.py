@@ -1,32 +1,39 @@
+pythonversion = 3.11
+
 from typing_extensions import Self # make sure to have the typing_extensions plugin (use pip to install)
-from enum import Enum
+
+if pythonversion == 3.11:
+    from enum import Enum, StrEnum #StrEnum is available in Python 3.11, see https://stackoverflow.com/a/69439703
+else:
+    from strenum import StrEnum # for version before this install pip install StrEnum and use 
+
 import numpy
 
 import pyvisa
 
-class AgilentPointsMode(str, Enum):
+class AgilentPointsMode(StrEnum):
     normal = "NORM"
     maximum = "MAX"
     raw = "RAW"
 
-class AgilentTimebaseMode(str, Enum):
+class AgilentTimebaseMode(StrEnum):
     window = "WIND"
     main = "MAIN"
     xy = "XY"
     roll = "ROLL"
 
-class AgilentAcquisitionType(str, Enum):
+class AgilentAcquisitionType(StrEnum):
     normal = "NORM"
     average = "AVER"
     high_resolution = "HRES"
     peak = "PEAK"
 
-class WaveformFormat(str, Enum):
-    ascii = "ASCii" # data is formatted as ASCII -> integers are converted to floats sent in scientific notation
+class WaveformFormat(StrEnum):
+    ascii = "ASCII" # data is formatted as ASCII -> integers are converted to floats sent in scientific notation
     word = "WORD" # data is sent ad 16 bit data, i.e. 2 bytes. The :Waveform:byteorder command sets which byte is sent first. If no command sent the upper byte is first
     byte = "BYTE" # data is sent as 8 bit data.
 
-class ByteOrder(str, Enum):
+class ByteOrder(StrEnum):
     lsbfirst = "LSBFIRST"
     msbfirst = "MSBFIRST"
 
@@ -136,9 +143,11 @@ class AgilentScope:
 
     def __read_ascii(self) -> numpy.array:
         self.visa_resource.write(AgilentScopeCommands.data_read)
-        data = self.visa_resource.read_raw().decode("utf-8")
-        data = data.split(", ") # separating the data points spaced and separated by a comma
+        data = self.visa_resource.read_raw().decode("ascii")
+        data = data.split(",") # separating the data points spaced and separated by a comma
         data[0] = data[0].split(" ")[-1] # removal of the header of the data: first data point: "#80001335 2.5e6"
+
+        data = list(map(lambda x: x.strip(), data))
 
         return numpy.array(data, dtype=float)
     
