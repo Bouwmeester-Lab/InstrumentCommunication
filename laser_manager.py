@@ -12,7 +12,8 @@ from time import sleep
 import warnings
 
 import matplotlib.pyplot as plt
-
+import pandas as pd
+from datetime import datetime
 plot_debug = False
 
 # not used
@@ -99,11 +100,14 @@ def calculateAllVoltages(voltages : np.array, height : float, find_minima : bool
 
 
 
-def getVoltages(scope : ag.AgilentScope, scope_channel : int, threshold : float) -> tuple[int, float, float]:
+def getVoltages(scope : ag.AgilentScope, scope_channel : int, threshold : float, saveScopeWaveform : bool = False, filename : str = None) -> tuple[int, float, float]:
     """
     Returns the cuadrant (from 0 to 3) of the resonance voltage, the resonance voltage and off resonance voltage - calculated -
     """
     voltages = scope.get_scope_waveform(scope_channel)
+    if saveScopeWaveform and filename is not None:
+        df = pd.DataFrame(voltages)
+        df.to_csv(f"{filename}_{datetime.utcnow().timestamp():.0f}.csv")
     return calculateAllVoltages(voltages, threshold)
 
 def calculateRatioInterference(off_resonance_voltages : np.array):
@@ -158,7 +162,9 @@ class LaserManager:
                  sweep_iteration_period : int = 100,
                  sweep_steps : int = 25,
                  do_search : bool = True,
-                 do_sweep : bool = True) -> None:
+                 do_sweep : bool = True,
+                 save_every_scope : bool = False,
+                 scope_trace_fileprefix : str = "voltages_") -> None:
         self.zurich = zurich
         self.scope = scope
         self.scope_channel = scope_channel
@@ -183,10 +189,15 @@ class LaserManager:
 
         self.do_search = do_search
         self.do_sweep = do_sweep
+        self.save_every_scope = save_every_scope
+        self.scope_trace_fileprefix = scope_trace_fileprefix
+
         if not self.do_sweep:
             warnings.warn("The sweep has been disabled. The program will not make a sweep every sweep_iteration_period periods. Ignore this warning if it was expected.")
         if not self.do_search:
             warnings.warn("The search has been disabled. The program will not search for the resonance if it isn't found or lost! Ignore this warning if it is expected.")
+        if self.save_every_scope:
+            warnings.warn("The scope trace will be saved on every iteration. This doesn't include the time base! Make sure you take note of the used time division, and time step of your scope! Large ammount of data can be produced.")
 
     def __resetSearch(self):
         self.search_step = 0
@@ -287,7 +298,7 @@ class LaserManager:
     
     def manage_loop(self, filename : str):
         try:
-            cuadrant, resonance_voltage, off_resonance_voltage = getVoltages(self.scope, self.scope_channel, self.peak_threshold)
+            cuadrant, resonance_voltage, off_resonance_voltage = getVoltages(self.scope, self.scope_channel, self.peak_threshold, self.save_every_scope, self.scope_trace_fileprefix)
             
             self.assert_enough_light(off_resonance_voltage)
 

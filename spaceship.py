@@ -31,8 +31,10 @@ def main(scope_resource_name : str,
           sweeping_period : int = 10,
           sweeping_total_range : float = 0.6,
           sweeping_steps : int = 25,
-          do_search = True,
-          do_sweep = True) -> None:
+          do_search : bool = True,
+          do_sweep : bool = True,
+          save_every_scope : bool = True,
+          scope_trace_fileprefix : str = "voltages_") -> None:
     # ask the scheduler
     with ag.AgilentScope(scope_resource_name) as scope:
         with zi.ZurichInstruments(zi_device_serial_name, api_level) as zurich:
@@ -46,7 +48,10 @@ def main(scope_resource_name : str,
                                          sweep_steps=sweeping_steps,
                                          search_step_size=search_step_size,
                                          do_search=do_search,
-                                         do_sweep=do_sweep)
+                                         do_sweep=do_sweep,
+                                         save_every_scope=save_every_scope,
+                                         scope_trace_fileprefix=scope_trace_fileprefix
+                                         )
 
             loop = task.LoopingCall(laser_manager.manage_loop, filename)
             loop.start(period_in_seconds)
@@ -77,7 +82,8 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
 
     do_search = True
     do_sweep = True
-
+    save_every_scope = False
+    scope_trace_fileprefix = "data/scopes/voltages_" # include a _ for the sake of readability after
 
     mode_hop_zones = [(float("-inf"), 1.4), (5.4, float("inf"))] # there's a mode hop between the smallest voltage to 1.4V and another between 5.4V and the largest voltage.
 
@@ -98,5 +104,7 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
         search_step_size=search_step_size,
         max_resonance_search_steps=max_resonance_search_steps,
         do_search=do_search,
-        do_sweep=do_sweep
+        do_sweep=do_sweep,
+        save_every_scope=save_every_scope,
+        scope_trace_fileprefix=scope_trace_fileprefix
         )
