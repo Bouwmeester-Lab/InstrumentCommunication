@@ -30,7 +30,9 @@ def main(scope_resource_name : str,
           max_resonance_search_steps : int = 10,
           sweeping_period : int = 10,
           sweeping_total_range : float = 0.6,
-          sweeping_steps : int = 25) -> None:
+          sweeping_steps : int = 25,
+          do_search = True,
+          do_sweep = True) -> None:
     # ask the scheduler
     with ag.AgilentScope(scope_resource_name) as scope:
         with zi.ZurichInstruments(zi_device_serial_name, api_level) as zurich:
@@ -42,7 +44,9 @@ def main(scope_resource_name : str,
                                          sweep_iteration_period=sweeping_period,
                                          sweep_total_range= sweeping_total_range,
                                          sweep_steps=sweeping_steps,
-                                         search_step_size=search_step_size)
+                                         search_step_size=search_step_size,
+                                         do_search=do_search,
+                                         do_sweep=do_sweep)
 
             loop = task.LoopingCall(laser_manager.manage_loop, filename)
             loop.start(period_in_seconds)
@@ -55,7 +59,7 @@ def main(scope_resource_name : str,
 if __name__ == "__main__": # runs only if ran directly. This is not a library
 
     period_in_seconds = 20 # how often do you want to run the measurement code?
-    scope_resource_name = "USB0::0x0957::0x179A::MY51450715::0::INSTR" # the scope VISA resource name.
+    scope_resource_name = "USB0::0x0957::0x179A::MY53160362::0::INSTR" # the scope VISA resource name.
     zi_device_serial_name = "dev812" # the name of the zurich instruments
     api_level = 1 # depends on the device used. HF2 only supports api level = 1, other devices support level 6.
     
@@ -71,7 +75,8 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
     sweeping_total_range = 0.6 # the total range of the sweep
     sweeping_steps = 25 # total number of steps in the sweep
 
-    
+    do_search = True
+    do_sweep = True
 
 
     mode_hop_zones = [(float("-inf"), 1.4), (5.4, float("inf"))] # there's a mode hop between the smallest voltage to 1.4V and another between 5.4V and the largest voltage.
@@ -91,5 +96,7 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
         sweeping_total_range=sweeping_total_range,
         sweeping_steps = sweeping_steps,
         search_step_size=search_step_size,
-        max_resonance_search_steps=max_resonance_search_steps
+        max_resonance_search_steps=max_resonance_search_steps,
+        do_search=do_search,
+        do_sweep=do_sweep
         )

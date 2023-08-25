@@ -9,6 +9,7 @@ from twisted.internet.task import LoopingCall
 import csv
 from datetime import datetime
 from time import sleep
+import warnings
 
 import matplotlib.pyplot as plt
 
@@ -155,7 +156,9 @@ class LaserManager:
                  max_search_steps : int = 5,
                  sweep_total_range : float = 0.6,
                  sweep_iteration_period : int = 100,
-                 sweep_steps : int = 25) -> None:
+                 sweep_steps : int = 25,
+                 do_search : bool = True,
+                 do_sweep : bool = True) -> None:
         self.zurich = zurich
         self.scope = scope
         self.scope_channel = scope_channel
@@ -177,6 +180,13 @@ class LaserManager:
         self.sweep_steps = sweep_steps
 
         self.loop_number = 0
+
+        self.do_search = do_search
+        self.do_sweep = do_sweep
+        if not self.do_sweep:
+            warnings.warn("The sweep has been disabled. The program will not make a sweep every sweep_iteration_period periods. Ignore this warning if it was expected.")
+        if not self.do_search:
+            warnings.warn("The search has been disabled. The program will not search for the resonance if it isn't found or lost! Ignore this warning if it is expected.")
 
     def __resetSearch(self):
         self.search_step = 0
@@ -282,8 +292,11 @@ class LaserManager:
             self.assert_enough_light(off_resonance_voltage)
 
             if not self.is_resonance_found(resonance_voltage, off_resonance_voltage):
-                # we haven't found the resonance. Time to search for it
-                self.search_resonance(resonance_voltage=resonance_voltage, off_resonance_voltage=off_resonance_voltage)
+                # we haven't found the resonance. Time to search for it if we enabled it
+                if do_search:
+                    self.search_resonance(resonance_voltage=resonance_voltage, off_resonance_voltage=off_resonance_voltage)
+                else:
+                    print("Resonance wasn't found but search has been disabled by setting do_search to False.")
             else:
                 print(f"Resonance was found!\nResonance voltage {resonance_voltage:.5f} V\nOff Resonance Voltage {off_resonance_voltage:.5f}\n")
                 # we have found the resonance.
@@ -301,7 +314,7 @@ class LaserManager:
                     print("Recentering peak from 4th cuadrant!")
                     self.laser.setVoltage(self.laser.getVoltage() - 0.002)
                     
-            if not (self.loop_number % self.sweep_iteration_period):
+            if not (self.loop_number % self.sweep_iteration_period) and self.do_sweep:
                 self.sweep(filename)
             self.loop_number += 1
         except NoLightError as e: # what to do if no light is detected?
