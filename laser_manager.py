@@ -293,7 +293,7 @@ class LaserManager:
 
             if not self.is_resonance_found(resonance_voltage, off_resonance_voltage):
                 # we haven't found the resonance. Time to search for it if we enabled it
-                if do_search:
+                if self.do_search:
                     self.search_resonance(resonance_voltage=resonance_voltage, off_resonance_voltage=off_resonance_voltage)
                 else:
                     print("Resonance wasn't found but search has been disabled by setting do_search to False.")
