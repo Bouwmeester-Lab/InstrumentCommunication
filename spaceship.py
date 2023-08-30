@@ -30,7 +30,8 @@ def main(scope_resource_name : str,
           max_resonance_search_steps : int = 10,
           sweeping_period : int = 10,
           sweeping_total_range : float = 0.6,
-          sweeping_steps : int = 25) -> None:
+          sweeping_steps : int = 25,
+          recentering_voltage_step : float = 0.002) -> None:
     # ask the scheduler
     with ag.AgilentScope(scope_resource_name) as scope:
         with zi.ZurichInstruments(zi_device_serial_name, api_level) as zurich:
@@ -42,7 +43,8 @@ def main(scope_resource_name : str,
                                          sweep_iteration_period=sweeping_period,
                                          sweep_total_range= sweeping_total_range,
                                          sweep_steps=sweeping_steps,
-                                         search_step_size=search_step_size)
+                                         search_step_size=search_step_size,
+                                         recentering_voltage_step=recentering_voltage_step)
 
             loop = task.LoopingCall(laser_manager.manage_loop, filename)
             loop.start(period_in_seconds)
@@ -54,23 +56,26 @@ def main(scope_resource_name : str,
 
 if __name__ == "__main__": # runs only if ran directly. This is not a library
 
-    period_in_seconds = 20 # how often do you want to run the measurement code?
+    period_in_seconds = 10 # how often do you want to run the measurement code?
     scope_resource_name = "USB0::0x0957::0x179A::MY51450715::0::INSTR" # the scope VISA resource name.
     zi_device_serial_name = "dev812" # the name of the zurich instruments
     api_level = 1 # depends on the device used. HF2 only supports api level = 1, other devices support level 6.
     
     file_name_path = "data/data" #this the prefix of all data files generated
 
-    peak_threshold = 0.15 # the minimum height of a peak to be considered a resonance
-    min_coupling = 0.5 # min coupling for considering a resonance as found
+    peak_threshold = 0.1 # the minimum height of a peak to be considered a resonance
+    min_coupling = 0.4 # min coupling for considering a resonance as found, the minimum coupling efficiency needed to consider the resonance found.
+    # for example if the coupling efficiency is below this number, the resonance will not be considered as found.
+    # it can help to detect the right mode (fundamental) for example, because another mode could have a lower coupling efficiency below this threshold,
+    # and like this be rejected even though the peak is seen.
 
-    max_resonance_search_steps = 100 # how many search steps occur before giving up!
+    max_resonance_search_steps = 300 # how many search steps occur before giving up!
     search_step_size = 0.009 # the search step size when trying to find a resonance
 
     sweeping_period = 30 # changes how often a sweep occurs
     sweeping_total_range = 0.6 # the total range of the sweep
     sweeping_steps = 25 # total number of steps in the sweep
-
+    recentering_voltage_step = 0.004
     
 
 
@@ -91,5 +96,6 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
         sweeping_total_range=sweeping_total_range,
         sweeping_steps = sweeping_steps,
         search_step_size=search_step_size,
-        max_resonance_search_steps=max_resonance_search_steps
+        max_resonance_search_steps=max_resonance_search_steps,
+        recentering_voltage_step=recentering_voltage_step
         )

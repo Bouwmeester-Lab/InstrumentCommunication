@@ -12,7 +12,8 @@ from time import sleep
 
 import matplotlib.pyplot as plt
 
-plot_debug = False
+plot_debug = True
+debug_coupling = True
 
 # not used
 class LoopingCallWithCounter:
@@ -64,7 +65,7 @@ def calculateAllVoltages(voltages : np.array, height : float, find_minima : bool
     if plot_debug:
         plt.plot(peaks, voltages[peaks], "x")
         plt.hlines(widths_height, left, right)
-        plt.show(block = False)
+        plt.show(block = True)
 
     if len(peaks) == 0:
         resonance_voltage = None
@@ -155,7 +156,8 @@ class LaserManager:
                  max_search_steps : int = 5,
                  sweep_total_range : float = 0.6,
                  sweep_iteration_period : int = 100,
-                 sweep_steps : int = 25) -> None:
+                 sweep_steps : int = 25,
+                 recentering_voltage_step : float = 0.002) -> None:
         self.zurich = zurich
         self.scope = scope
         self.scope_channel = scope_channel
@@ -175,6 +177,7 @@ class LaserManager:
         self.sweep_total_range = sweep_total_range
         self.sweep_iteration_period = sweep_iteration_period
         self.sweep_steps = sweep_steps
+        self.recentering_voltage_step = recentering_voltage_step
 
         self.loop_number = 0
 
@@ -220,6 +223,8 @@ class LaserManager:
             return False
         
         coupling_efficiency = (off_resonance_voltage - resonance_voltage) / off_resonance_voltage
+        if debug_coupling:
+            print(f"Counpling efficiency is {coupling_efficiency:.3f}. Threshold used: {self.min_coupling:.3f}")
         return coupling_efficiency > self.min_coupling
     
     def assert_enough_light(self, off_resonance_voltage):
@@ -274,6 +279,7 @@ class LaserManager:
         # reset the voltage to the original value
         print(f"Setting original voltage of {original_voltage:.4e} V.")
         self.laser.setVoltage(original_voltage)
+        sleep(3)
     
     def manage_loop(self, filename : str):
         try:
@@ -296,10 +302,10 @@ class LaserManager:
                 # centers the peak if needed
                 if cuadrant == 0:
                     print("Recentering peak from 1st cuadrant!")
-                    self.laser.setVoltage(self.laser.getVoltage() + 0.002)
+                    self.laser.setVoltage(self.laser.getVoltage() + self.recentering_voltage_step)
                 elif cuadrant == 3:
                     print("Recentering peak from 4th cuadrant!")
-                    self.laser.setVoltage(self.laser.getVoltage() - 0.002)
+                    self.laser.setVoltage(self.laser.getVoltage() - self.recentering_voltage_step)
                     
             if not (self.loop_number % self.sweep_iteration_period):
                 self.sweep(filename)
