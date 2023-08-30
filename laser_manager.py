@@ -14,7 +14,7 @@ import warnings
 import matplotlib.pyplot as plt
 import pandas as pd
 from datetime import datetime
-plot_debug = True
+plot_debug = False
 debug_coupling = True
 
 # not used
@@ -205,33 +205,44 @@ class LaserManager:
 
     def __resetSearch(self):
         self.search_step = 0
-        self.search_direction = -1
+        self.search_direction *= -1 # flip direction
+
+    def __searchSleepTime(self, voltage : float):
+        if voltage < 1:
+            return 0.2
+        else:
+            return 2
         
     def search_resonance(self, resonance_voltage, off_resonance_voltage):
         print("Searching resonance...")
-        
+        cuadrant, resonance_voltage, off_resonance_voltage = None, None, None
         for i in range(self.max_search_steps):
             if self.is_resonance_found(resonance_voltage, off_resonance_voltage):
                 print("Found resonance after searching")
-                return # return, end the search
+                self.__resetSearch()
+                print("Search has been reset.")
+                return cuadrant, resonance_voltage, off_resonance_voltage
             
             self.search_step += self.search_step_size
             self.search_direction *= -1 # flip the search direction on each step
+            voltage_to_set = self.laser.getVoltage() + self.search_direction*self.search_step
             try:
-                self.laser.setVoltage(self.laser.getVoltage() + self.search_direction*self.search_step)
+                self.laser.setVoltage(voltage_to_set)
             except VoltageModeHopError: # if we get out of the safe range restart the search.
                 self.__resetSearch()
                 continue
 
             # get the resonance voltage from the scope again after a small pause
-            sleep(3)
+            sleep(self.__searchSleepTime(voltage_to_set))
 
-            _, resonance_voltage, off_resonance_voltage = getVoltages(self.scope, self.scope_channel, self.peak_threshold)
+            cuadrant, resonance_voltage, off_resonance_voltage = getVoltages(self.scope, self.scope_channel, self.peak_threshold)
             self.assert_enough_light(off_resonance_voltage) # check that there's still light        
         
         if self.is_resonance_found(resonance_voltage, off_resonance_voltage):
             print("Found resonance after searching")
-            return # return, end the search
+            self.__resetSearch()
+            print("Search has been reset.")
+            return cuadrant, resonance_voltage, off_resonance_voltage
         
         raise SearchStepsExhausted(f"Couldn't find the resonance after {self.max_search_steps}")
 
@@ -299,7 +310,7 @@ class LaserManager:
         append_data(filename=f"{filename}_minmax_sweep.csv", datetime=now, data = [difference_min_max, ratio_min_max])
 
         # reset the voltage to the original value
-        print(f"Setting original voltage of {original_voltage:.4e} V.")
+        print(f"Setting original voltage of {original_voltage:.4e} V. Waiting for next loop iteration.")
         self.laser.setVoltage(original_voltage)
         sleep(3)
     
@@ -312,25 +323,28 @@ class LaserManager:
             if not self.is_resonance_found(resonance_voltage, off_resonance_voltage):
                 # we haven't found the resonance. Time to search for it if we enabled it
                 if self.do_search:
-                    self.search_resonance(resonance_voltage=resonance_voltage, off_resonance_voltage=off_resonance_voltage)
+                    #this will stay in the search until found or search steps exhausted.
+                    cuadrant, resonance_voltage, off_resonance_voltage = self.search_resonance(resonance_voltage=resonance_voltage, off_resonance_voltage=off_resonance_voltage)
                 else:
                     print("Resonance wasn't found but search has been disabled by setting do_search to False.")
-            else:
-                print(f"Resonance was found!\nResonance voltage {resonance_voltage:.5f} V\nOff Resonance Voltage {off_resonance_voltage:.5f}\n")
-                # we have found the resonance.
-                now = datetime.utcnow() # use utc time to avoid time zone issues
-                # save the data
-                print(f"Appending data to {filename}_off_resonance.csv and {filename}_resonance.csv")
-                append_data(filename=f"{filename}_off_resonance.csv", datetime=now, data=off_resonance_voltage)
-                append_data(filename=f"{filename}_resonance.csv", datetime=now, data=resonance_voltage)
+                    self.loop_number += 1
+                    return # stop the execution of this loop.
+            
+            print(f"Resonance was found!\nResonance voltage {resonance_voltage:.5f} V\nOff Resonance Voltage {off_resonance_voltage:.5f}\n")
+            # we have found the resonance.
+            now = datetime.utcnow() # use utc time to avoid time zone issues
+            # save the data
+            print(f"Appending data to {filename}_off_resonance.csv and {filename}_resonance.csv")
+            append_data(filename=f"{filename}_off_resonance.csv", datetime=now, data=off_resonance_voltage)
+            append_data(filename=f"{filename}_resonance.csv", datetime=now, data=resonance_voltage)
 
-                # centers the peak if needed
-                if cuadrant == 0:
-                    print("Recentering peak from 1st cuadrant!")
-                    self.laser.setVoltage(self.laser.getVoltage() + self.recentering_voltage_step)
-                elif cuadrant == 3:
-                    print("Recentering peak from 4th cuadrant!")
-                    self.laser.setVoltage(self.laser.getVoltage() - self.recentering_voltage_step)
+            # centers the peak if needed
+            if cuadrant == 0:
+                print("Recentering peak from 1st cuadrant!")
+                self.laser.setVoltage(self.laser.getVoltage() + self.recentering_voltage_step)
+            elif cuadrant == 3:
+                print("Recentering peak from 4th cuadrant!")
+                self.laser.setVoltage(self.laser.getVoltage() - self.recentering_voltage_step)
                     
             if not (self.loop_number % self.sweep_iteration_period) and self.do_sweep:
                 self.sweep(filename)

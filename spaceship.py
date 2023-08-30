@@ -72,14 +72,14 @@ if __name__ == "__main__": # runs only if ran directly. This is not a library
     
     file_name_path = "data/data" #this the prefix of all data files generated
 
-    peak_threshold = 0.1 # the minimum height of a peak to be considered a resonance
+    peak_threshold = 0.1 # the minimum height of a peak to be considered a peak (not necessarily a resonance)
     min_coupling = 0.4 # min coupling for considering a resonance as found, the minimum coupling efficiency needed to consider the resonance found.
     # for example if the coupling efficiency is below this number, the resonance will not be considered as found.
     # it can help to detect the right mode (fundamental) for example, because another mode could have a lower coupling efficiency below this threshold,
     # and like this be rejected even though the peak is seen.
 
     max_resonance_search_steps = 300 # how many search steps occur before giving up!
-    search_step_size = 0.009 # the search step size when trying to find a resonance
+    search_step_size = 0.005 # the search step size when trying to find a resonance
 
     sweeping_period = 30 # changes how often a sweep occurs
     sweeping_total_range = 0.6 # the total range of the sweep
