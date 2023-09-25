@@ -164,6 +164,7 @@ class LaserManager:
                  sweep_steps : int = 25,
 
                  recentering_voltage_step : float = 0.002,
+                 initial_voltage : float = 3.5,
                  do_search : bool = True,
                  do_sweep : bool = True,
                  save_every_scope : bool = False,
@@ -188,6 +189,7 @@ class LaserManager:
         self.sweep_iteration_period = sweep_iteration_period
         self.sweep_steps = sweep_steps
         self.recentering_voltage_step = recentering_voltage_step
+        self.initial_voltage = initial_voltage
 
         self.loop_number = 0
 
@@ -206,6 +208,11 @@ class LaserManager:
     def __resetSearch(self):
         self.search_step = 0
         self.search_direction *= -1 # flip direction
+        try:
+            self.laser.setVoltage(self.initial_voltage)
+            print(f"Search was reset to {self.initial_voltage:.4f}")
+        except VoltageModeHopError: # if we get out of the safe range restart the search.
+                warnings.warn("Initial voltage was outside the allowed range. The search cannot be reset.")
 
     def __searchSleepTime(self, voltage : float):
         if voltage < 1:
@@ -230,6 +237,7 @@ class LaserManager:
                 self.laser.setVoltage(voltage_to_set)
             except VoltageModeHopError: # if we get out of the safe range restart the search.
                 self.__resetSearch()
+                print("Voltage was outside the allowed range.")
                 continue
 
             # get the resonance voltage from the scope again after a small pause
