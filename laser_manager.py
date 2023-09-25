@@ -10,6 +10,7 @@ import csv
 from datetime import datetime
 from time import sleep
 import warnings
+import pyvisa
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -105,11 +106,15 @@ def getVoltages(scope : ag.AgilentScope, scope_channel : int, threshold : float,
     """
     Returns the cuadrant (from 0 to 3) of the resonance voltage, the resonance voltage and off resonance voltage - calculated -
     """
-    voltages = scope.get_scope_waveform(scope_channel)
-    if saveScopeWaveform and filename is not None:
-        df = pd.DataFrame(voltages)
-        df.to_csv(f"{filename}_{datetime.utcnow().timestamp():.0f}.csv")
-    return calculateAllVoltages(voltages, threshold)
+    try:
+        voltages = scope.get_scope_waveform(scope_channel)
+        if saveScopeWaveform and filename is not None:
+            df = pd.DataFrame(voltages)
+            df.to_csv(f"{filename}_{datetime.utcnow().timestamp():.0f}.csv")
+        return calculateAllVoltages(voltages, threshold)
+    except pyvisa.errors.VisaIOError as e:
+        warnings.warn("The oscilloscope might be frozen!")
+        raise e
 
 def calculateRatioInterference(off_resonance_voltages : np.array):
     """
