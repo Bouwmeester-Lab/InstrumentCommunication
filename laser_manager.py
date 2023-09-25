@@ -210,14 +210,15 @@ class LaserManager:
         if self.save_every_scope:
             warnings.warn("The scope trace will be saved on every iteration. This doesn't include the time base! Make sure you take note of the used time division, and time step of your scope! Large ammount of data can be produced.")
 
-    def __resetSearch(self):
+    def __resetSearch(self, resetVoltage = False):
         self.search_step = 0
         self.search_direction *= -1 # flip direction
-        try:
-            self.laser.setVoltage(self.initial_voltage)
-            print(f"Search was reset to {self.initial_voltage:.4f}")
-        except VoltageModeHopError: # if we get out of the safe range restart the search.
-                warnings.warn("Initial voltage was outside the allowed range. The search cannot be reset.")
+        if resetVoltage:
+            try:
+                self.laser.setVoltage(self.initial_voltage)
+                print(f"Search was reset to {self.initial_voltage:.4f}")
+            except VoltageModeHopError: # if we get out of the safe range restart the search.
+                    warnings.warn("Initial voltage was outside the allowed range. The search cannot be reset.")
 
     def __searchSleepTime(self, voltage : float):
         if voltage < 1:
@@ -241,7 +242,7 @@ class LaserManager:
             try:
                 self.laser.setVoltage(voltage_to_set)
             except VoltageModeHopError: # if we get out of the safe range restart the search.
-                self.__resetSearch()
+                self.__resetSearch(resetVoltage=True)
                 print("Voltage was outside the allowed range.")
                 continue
 
